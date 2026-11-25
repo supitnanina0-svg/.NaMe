@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NaMehost</title>
+  <style>
+    body{font-family:system-ui,-apple-system,sans-serif;background:#0f172a;color:#f8fafc;margin:0;padding:24px}
+    .box{max-width:720px;margin:0 auto;background:#1e293b;padding:20px;border-radius:12px}
+    input,textarea,button{width:100%;box-sizing:border-box;margin-top:8px;padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#f8fafc}
+    button{background:#3b82f6;border:none;font-weight:600;cursor:pointer}
+    .row{display:flex;gap:10px}
+    .site-item{background:#0f172a;padding:12px;border-radius:8px;margin-top:10px}
+    a{color:#60a5fa}
+  </style>
+</head>
+<body>
+  <div class="box" id="app"></div>
+
+  <script type="module">
+    const _k9 = [
+      "aHR0cHM6Ly9lc20uc2gvQHN1cGFiYXNlL3N1cGFiYXNlLWpzQDI=",
+      "aHR0cHM6Ly9kcXh4ZG12Zm1ld3NzZWZtaHBwcy5zdXBhYmFzZS5jbw==",
+      "c2JfcHVibGlzaGFibGVfeHNQZWltdEltOTE0ZzgxclcyREpid19COTlWbW1Yaw==",
+      "YXBw",
+      "U0hBLTI1Ng==",
+      "MA==",
+      "I3Mt",
+      "bmFtZV9zaXRlcw==",
+      "Kg==",
+      "aWQ=",
+      "PGgyPlNpdGUgbm90IGZvdW5kPC9oMj48cD48YSBocmVmPSI=",
+      "Ij5CYWNrIHRvIE5hTWVob3N0PC9hPjwvcD4=",
+      "IC0gTmFNZWhvc3Q=",
+      "PGgyPk5hTWVob3N0PC9oMj48cD5TaWduIGluIG9yIHJlZ2lzdGVyIGFuIGFjY291bnQ8L3A+PGlucHV0IGlkPSJ1IiBwbGFjZWhvbGRlcj0iVXNlcm5hbWUiIC8+PGlucHV0IGlkPSJwIiB0eXBlPSJwYXNzd29yZCIgcGxhY2Vob2xkZXI9IlBhc3N3b3JkIiAvPjxkaXYgY2xhc3M9InJvdyI+PGJ1dHRvbiBpZD0ibG9naW5CdG4iPlNpZ24gSW48L2J1dHRvbj48YnV0dG9uIGlkPSJyZWdCdG4iPlJlZ2lzdGVyPC9idXR0b24+PC9kaXY+PHAgeWQ9Im1zZyI+PC9wPg==".replace('pyq="msg"','id="msg"'),
+      "bXNn",
+      "cmVnQnRu",
+      "dQ==",
+      "cA==",
+      "RW50ZXIgdXNlcm5hbWUgYW5kIHBhc3N3b3JkLg==",
+      "bmFtZV91c2Vycw==",
+      "UmVnaXN0ZXJlZCEgTm93IHNpZ24gaW4u",
+      "bG9naW5CdG4=",
+      "dXNlcm5hbWU=",
+      "cGFzc19oYXNo",
+      "SW52YWxpZCBjcmVkZW50aWFscy4=",
+      "PGgyPk5hTWVob3N0ICZtZGFzaDsgQA==",
+      "PC9oMj48aW5wdXQgaWQ9InNpdGVOYW1lIiBwbGFjZWhvbGRlcj0iU2l0ZSB0aXRsZSAoZS5nLiBNeSBQYWdlKSIgLz48dGV4dGFyZWEgaWQ9InNpdGVIdG1sIiByb3dzPSI4IiBwbGFjZWhvbGRlcj0iJmx0O2gxJmd0O0hlbGxvIGZyb20gTmFNZWhvc3QmbHQ7L2gxJmd0OyI+PC90ZXh0YXJlYT48YnV0dG9uIGlkPSJzYXZlQnRuIj5QdWJsaXNoIC8gU2F2ZSBTaXRlPC9idXR0b24+PGJ1dHRvbiBpZD0ibG9nb3V0QnRuIj5TaWduIE91dDwvYnV0dG9uPjxwIGlkPSJtc2ciPjwvcD48aDM+WW91ciBTaXRlczwvaDM+PGRpdiBpZD0ibGlzdCI+TG9hZGluZy4uLjwvZGl2Pg==",
+      "bG9nb3V0QnRu",
+      "c2F2ZUJ0bg==",
+      "c2l0ZU5hbWU=",
+      "VW50aXRsZWQ=",
+      "c2l0ZUh0bWw=",
+      "LQ==",
+      "dG9TdHJpbmc=",
+      "U2F2ZWQhIFNoYXJlIGxpbms6IA==",
+      "b3duZXI=",
+      "dXBkYXRlZA==",
+      "bGlzdA==",
+      "PHA+Tm8gc2l0ZXMgeWV0LjwvcD4=",
+      "PGRpdiBjbGFzcz0ic2l0ZS1pdGVtIj48c3Ryb25nPg==",
+      "PC9zdHJvbmc+PGJyIC8+PGEgaHJlZj0i",
+      "IiB0YXJnZXQ9Il9ibGFuayI+",
+      "PC9hPjwvZGl2Pg=="
+    ];
+
+    const _rot = 7;
+    const _pool = _k9.map(s => atob(s));
+    for (let i = 0; i < _rot; i++) _pool.push(_pool.shift());
+    const _s = idx => _pool[(idx + _pool.length - _rot) % _pool.length];
+
+    const { createClient: _cc } = await import(_s(0));
+    const _db = _cc(_s(1), _s(2));
+    const _el = document.getElementById(_s(3));
+    let _u = null;
+
+    async function _h(v) {
+      const d = await crypto.subtle.digest(_s(4), new TextEncoder().encode(v));
+      return Array.from(new Uint8Array(d)).map(b => b[_s(33)](16).padStart(2, _s(5))).join("");
+    }
+
+    function _sid() {
+      const h = location.hash || "";
+      return h.startsWith(_s(6)) ? h.slice(3) : null;
+    }
+
+    async function _view(id) {
+      const { data: r, error: e } = await _db.from(_s(7)).select(_s(8)).eq(_s(9), id).single();
+      if (e || !r) {
+        _el.innerHTML = _s(10) + location.pathname + _s(11);
+        return;
+      }
+      document.title = r.name + _s(12);
+      document.open();
+      document.write(r.html);
+      document.close();
+    }
+
+    function _auth() {
+      _el.innerHTML = _s(13);
+      const m = document.getElementById(_s(14));
+      document.getElementById(_s(15)).onclick = async () => {
+        const u = document.getElementById(_s(16)).value.trim().toLowerCase();
+        const p = document.getElementById(_s(17)).value;
+        if (!u || !p) return (m.textContent = _s(18));
+        const pw = await _h(p);
+        const { error: e } = await _db.from(_s(19)).insert({ [_s(22)]: u, [_s(23)]: pw });
+        m.textContent = e ? e.message : _s(20);
+      };
+      document.getElementById(_s(21)).onclick = async () => {
+        const u = document.getElementById(_s(16)).value.trim().toLowerCase();
+        const p = document.getElementById(_s(17)).value;
+        if (!u || !p) return (m.textContent = _s(18));
+        const pw = await _h(p);
+        const { data: r, error: e } = await _db.from(_s(19)).select(_s(22)).eq(_s(22), u).eq(_s(23), pw).single();
+        if (e || !r) {
+          m.textContent = _s(24);
+          return;
+        }
+        _u = r.username;
+        _dash();
+      };
+    }
+
+    async function _dash() {
+      _el.innerHTML = _s(25) + _u + _s(26);
+      document.getElementById(_s(27)).onclick = () => {
+        _u = null;
+        _auth();
+      };
+      document.getElementById(_s(28)).onclick = async () => {
+        const nm = document.getElementById(_s(29)).value.trim() || _s(30);
+        const ht = document.getElementById(_s(31)).value;
+        const id = _u + _s(32) + Date.now()[_s(33)](36);
+        const ts = Date.now();
+        const { error: e } = await _db.from(_s(7)).insert({ [_s(9)]: id, [_s(35)]: _u, name: nm, html: ht, [_s(36)]: ts });
+        document.getElementById(_s(14)).textContent = e ? e.message : _s(34) + location.origin + location.pathname + _s(6) + id;
+        _list();
+      };
+
+      async function _list() {
+        const { data: rows } = await _db.from(_s(7)).select(_s(8)).eq(_s(35), _u).order(_s(36), { ascending: false });
+        const box = document.getElementById(_s(37));
+        if (!rows || !rows.length) {
+          box.innerHTML = _s(38);
+          return;
+        }
+        box.innerHTML = rows.map(x => {
+          const url = location.origin + location.pathname + _s(6) + x.id;
+          return _s(39) + x.name + _s(40) + url + _s(41) + url + _s(42);
+        }).join("");
+      }
+      _list();
+    }
+
+    const activeId = _sid();
+    if (activeId) {
+      _view(activeId);
+    } else {
+      _auth();
+    }
+  </script>
+</body>
+</html>
