@@ -331,4 +331,138 @@
   </script>
 </body>
 </html>
+ntent = "Signing in...";
+            const pass_hash = await hashPw(p);
+            const { data, error } = await sb.from("name_users").select("username").eq("username", u).eq("pass_hash", pass_hash).single();
+            if (error || !data) { msg.textContent = error ? error.message : "Invalid username or password."; return; }
+            user = data.username;
+            try { localStorage.setItem(SESSION_KEY, user); } catch {}
+            go("dashboard");
+          } catch (e) {
+            msg.textContent = e.message || String(e);
+          }
+        };
+
+        main.append(el("div", { class: "card", style: "max-width:440px;margin:20px auto" }, [
+          el("h2", { text: "Account Access" }),
+          el("p", { style: "color:var(--muted)", text: "Sign in or create a new NaMehost creator account." }),
+          uIn, pIn,
+          el("div", { class: "row" }, [
+            el("button", { class: "btn", style: "flex:1", text: "Sign In", onclick: doIn }),
+            el("button", { class: "btn sec", style: "flex:1", text: "Register", onclick: doReg })
+          ]),
+          msg
+        ]));
+      }
+
+      if (target === "editor") {
+        const titleIn = el("input", { placeholder: "Site Title (e.g. My Portfolio)" });
+        const starter = "<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: sans-serif; background: #0f172a; color: #fff; text-align: center; padding: 50px; }\n    h1 { color: #38bdf8; }\n  </style>\n</head>\n<body>\n  <h1>Hello from NaMehost!</h1>\n  <p>Edit this code and click Publish.</p>\n</body>\n</html>";
+        const codeIn = el("textarea", { rows: "14" }, [starter]);
+        const prev = el("iframe", { class: "prev", sandbox: "allow-scripts" });
+        prev.srcdoc = starter;
+        codeIn.oninput = () => { prev.srcdoc = codeIn.value; };
+        const msg = el("div", { class: "msg" });
+
+        const doPub = async () => {
+          try {
+            const nm = titleIn.value.trim() || "Untitled Site";
+            const id = user + "-" + Date.now().toString(36);
+            msg.textContent = "Publishing...";
+            const { error } = await sb.from("name_sites").insert({ id, owner: user, name: nm, html: codeIn.value, updated: Date.now() });
+            if (error) { msg.textContent = error.message; return; }
+            const url = shareUrl(id);
+            try { await navigator.clipboard.writeText(url); } catch {}
+            msg.replaceChildren("Published! ", el("a", { href: url, target: "_blank", text: url }));
+          } catch (e) {
+            msg.textContent = e.message || String(e);
+          }
+        };
+
+        main.append(el("div", { class: "card" }, [
+          el("h2", { style: "margin-top:0", text: "Site Builder & Live Preview" }),
+          titleIn,
+          el("div", { class: "split" }, [
+            el("div", {}, [el("label", { style: "font-size:.85rem;color:var(--muted)", text: "HTML / CSS / JS Source" }), codeIn]),
+            el("div", {}, [el("label", { style: "font-size:.85rem;color:var(--muted)", text: "Live Preview" }), prev])
+          ]),
+          el("div", { class: "row" }, [
+            el("button", { class: "btn", text: "Publish Site", onclick: doPub }),
+            el("button", { class: "btn sec", text: "Back to Dashboard", onclick: () => go("dashboard") })
+          ]),
+          msg
+        ]));
+      }
+
+      if (target === "dashboard") {
+        const listBox = el("div", { text: "Loading your sites..." });
+        main.append(
+          el("div", { class: "card" }, [
+            el("div", { class: "row", style: "justify-content:space-between" }, [
+              el("div", {}, [el("h2", { style: "margin:0", text: "Creator Dashboard" }), el("p", { style: "color:var(--muted);margin:4px 0 0", text: "Signed in as @" + user })]),
+              el("button", { class: "btn", text: "+ Create New Site", onclick: () => go("editor") })
+            ])
+          ]),
+          el("div", { class: "card" }, [el("h3", { text: "Your Hosted Sites" }), listBox])
+        );
+        root.replaceChildren(buildNav(), main);
+
+        const { data } = await sb.from("name_sites").select("*").eq("owner", user).order("updated", { ascending: false });
+        if (!data || !data.length) {
+          listBox.textContent = "No sites published yet. Click '+ Create New Site' to start.";
+        } else {
+          listBox.replaceChildren(...data.map(s => {
+            const url = shareUrl(s.id);
+            return el("div", { class: "site-card" }, [
+              el("div", {}, [el("strong", { text: s.name }), el("br"), el("a", { href: url, target: "_blank", text: url })]),
+              el("div", { class: "row" }, [
+                el("a", { class: "nav-btn active", href: url, target: "_blank", text: "Open" }),
+                el("button", {
+                  class: "btn del",
+                  text: "Delete",
+                  onclick: async () => {
+                    await sb.from("name_sites").delete().eq("id", s.id).eq("owner", user);
+                    go("dashboard");
+                  }
+                })
+              ])
+            ]);
+          }));
+        }
+        return;
+      }
+
+      if (target === "explore") {
+        const listBox = el("div", { text: "Loading sites..." });
+        main.append(el("div", { class: "card" }, [
+          el("h2", { text: "Explore Recent Sites" }),
+          el("p", { style: "color:var(--muted)", text: "Public websites hosted on NaMehost." }),
+          listBox
+        ]));
+        root.replaceChildren(buildNav(), main);
+
+        const { data } = await sb.from("name_sites").select("id,name,owner,updated").order("updated", { ascending: false }).limit(20);
+        if (!data || !data.length) {
+          listBox.textContent = "No public sites yet.";
+        } else {
+          listBox.replaceChildren(...data.map(s => {
+            const url = shareUrl(s.id);
+            return el("div", { class: "site-card" }, [
+              el("div", {}, [el("strong", { text: s.name + " " }), el("span", { class: "badge", text: "@" + s.owner }), el("br"), el("a", { href: url, target: "_blank", text: url })]),
+              el("a", { class: "nav-btn active", href: url, target: "_blank", text: "Visit Site" })
+            ]);
+          }));
+        }
+        return;
+      }
+
+      root.replaceChildren(buildNav(), main);
+    }
+
+    const h = location.hash || "";
+    if (h.startsWith("#s-")) renderHosted(h.slice(3));
+    else go("home");
+  </script>
+</body>
+</html>
 
