@@ -1,2 +1,0 @@
-# .NaMe
-The web host
