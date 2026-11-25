@@ -34,7 +34,7 @@
     .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     @media(max-width:720px){.split{grid-template-columns:1fr}}
     iframe.prev{width:100%;height:320px;border:1px solid #334155;border-radius:9px;background:#fff;margin-top:8px}
-    .msg{margin-top:10px;font-size:.9rem;color:#93c5fd}
+    .msg{margin-top:10px;font-size:.9rem;color:#93c5fd;word-break:break-word}
     a{color:#60a5fa;text-decoration:none}
   </style>
 </head>
@@ -77,12 +77,21 @@
     const { createClient: _mk } = await import(_t(0));
     const _sb = _mk(_t(1), _t(2));
     const _root = document.getElementById(_t(3));
-    let _user = localStorage.getItem(_t(15)) || null;
+    let _user = null;
+    try { _user = localStorage.getItem(_t(15)) || null; } catch {}
     let _page = "home";
 
     async function _hash(str) {
-      const buf = await crypto.subtle.digest(_t(4), new TextEncoder().encode(str));
-      return Array.from(new Uint8Array(buf)).map(b => b[_t(16)](16).padStart(2, _t(5))).join("");
+      if (window.crypto && crypto.subtle && typeof crypto.subtle.digest === "function") {
+        const buf = await crypto.subtle.digest(_t(4), new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(buf)).map(b => b[_t(16)](16).padStart(2, _t(5))).join("");
+      }
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0).toString(16).padStart(8, _t(5));
     }
 
     function _shareUrl(id) {
@@ -127,7 +136,7 @@
       const lo = document.getElementById("logoutBtn");
       if (lo) lo.onclick = () => {
         _user = null;
-        localStorage.removeItem(_t(15));
+        try { localStorage.removeItem(_t(15)); } catch {}
         _go("home");
       };
     }
@@ -205,6 +214,146 @@
         <div class="card">
           <h2 style="margin-top:0">Site Builder & Live Preview</h2>
           <input id="sTitle" placeholder="Site Title (e.g. My Portfolio)" />
+          <div class="split">
+            <div>
+              <label style="font-size:.85rem;color:var(--muted)">HTML / CSS / JS Source</label>
+              <textarea id="sCode" rows="14"><!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: sans-serif; background: #0f172a; color: #fff; text-align: center; padding: 50px; }
+    h1 { color: #38bdf8; }
+  </style>
+</head>
+<body>
+  <h1>Hello from NaMehost!</h1>
+  <p>Edit this code and click Publish.</p>
+</body>
+</html></textarea>
+            </div>
+            <div>
+              <label style="font-size:.85rem;color:var(--muted)">Live Preview</label>
+              <iframe id="sPrev" class="prev" sandbox="allow-scripts"></iframe>
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn" id="pubBtn">Publish Site</button>
+            <button class="btn sec" data-go="dashboard">Back to Dashboard</button>
+          </div>
+          <div class="msg" id="edMsg"></div>
+        </div>`;
+      }
+
+      _root.innerHTML = `${_navHtml()}<main>${body}</main>`;
+      _bindNav();
+
+      if (target === "auth") {
+        const msg = document.getElementById("authMsg");
+        document.getElementById("upBtn").onclick = async () => {
+          try {
+            const u = document.getElementById("uIn").value.trim().toLowerCase();
+            const p = document.getElementById("pIn").value;
+            if (!u || !p) { msg.textContent = _t(19); return; }
+            msg.textContent = "Registering...";
+            const pw = await _hash(p);
+            const { error } = await _sb.from(_t(10)).insert({ [_t(11)]: u, [_t(12)]: pw });
+            msg.textContent = error ? error.message : _t(20);
+          } catch (err) {
+            msg.textContent = err && err.message ? err.message : String(err);
+          }
+        };
+        document.getElementById("inBtn").onclick = async () => {
+          try {
+            const u = document.getElementById("uIn").value.trim().toLowerCase();
+            const p = document.getElementById("pIn").value;
+            if (!u || !p) { msg.textContent = _t(19); return; }
+            msg.textContent = "Signing in...";
+            const pw = await _hash(p);
+            const { data, error } = await _sb.from(_t(10)).select(_t(11)).eq(_t(11), u).eq(_t(12), pw).single();
+            if (error || !data) { msg.textContent = error ? error.message : _t(21); return; }
+            _user = data.username;
+            try { localStorage.setItem(_t(15), _user); } catch {}
+            _go("dashboard");
+          } catch (err) {
+            msg.textContent = err && err.message ? err.message : String(err);
+          }
+        };
+      }
+
+      if (target === "editor") {
+        const codeEl = document.getElementById("sCode");
+        const prevEl = document.getElementById("sPrev");
+        const sync = () => { prevEl.srcdoc = codeEl.value; };
+        codeEl.oninput = sync;
+        sync();
+
+        document.getElementById("pubBtn").onclick = async () => {
+          const m = document.getElementById("edMsg");
+          try {
+            const nm = document.getElementById("sTitle").value.trim() || _t(23);
+            const ht = codeEl.value;
+            const id = _user + _t(17) + Date.now()[_t(16)](36);
+            m.textContent = "Publishing...";
+            const { error } = await _sb.from(_t(7)).insert({ [_t(9)]: id, [_t(13)]: _user, name: nm, html: ht, [_t(14)]: Date.now() });
+            if (error) { m.textContent = error.message; return; }
+            const url = _shareUrl(id);
+            try { await navigator.clipboard.writeText(url); } catch {}
+            m.innerHTML = `${_t(22)} <a href="${url}" target="_blank">${url}</a>`;
+          } catch (err) {
+            m.textContent = err && err.message ? err.message : String(err);
+          }
+        };
+      }
+
+      if (target === "dashboard") {
+        const box = document.getElementById("mySites");
+        const load = async () => {
+          const { data } = await _sb.from(_t(7)).select(_t(8)).eq(_t(13), _user).order(_t(14), { ascending: false });
+          if (!data || !data.length) { box.innerHTML = `<p style="color:var(--muted)">No sites published yet. Click "+ Create New Site" to start.</p>`; return; }
+          box.innerHTML = data.map(s => {
+            const url = _shareUrl(s.id);
+            return `<div class="site-card">
+              <div><strong>${s.name}</strong><br><a href="${url}" target="_blank">${url}</a></div>
+              <div class="row">
+                <a class="nav-btn active" href="${url}" target="_blank">Open</a>
+                <button class="btn del" style="margin:0" data-del="${s.id}">Delete</button>
+              </div>
+            </div>`;
+          }).join("");
+          box.querySelectorAll("[data-del]").forEach(b => {
+            b.onclick = async () => {
+              await _sb.from(_t(7)).delete().eq(_t(9), b.getAttribute("data-del")).eq(_t(13), _user);
+              load();
+            };
+          });
+        };
+        load();
+      }
+
+      if (target === "explore") {
+        const box = document.getElementById("exploreList");
+        const { data } = await _sb.from(_t(7)).select("id,name,owner,updated").order(_t(14), { ascending: false }).limit(20);
+        if (!data || !data.length) { box.innerHTML = `<p style="color:var(--muted)">No public sites yet.</p>`; return; }
+        box.innerHTML = data.map(s => {
+          const url = _shareUrl(s.id);
+          return `<div class="site-card">
+            <div><strong>${s.name}</strong> <span class="badge">@${s.owner}</span><br><a href="${url}" target="_blank">${url}</a></div>
+            <a class="nav-btn active" href="${url}" target="_blank">Visit Site</a>
+          </div>`;
+        }).join("");
+      }
+    }
+
+    const h = location.hash || "";
+    if (h.startsWith(_t(6))) {
+      _renderHosted(h.slice(3));
+    } else {
+      _go("home");
+    }
+  </script>
+</body>
+</html>
+sTitle" placeholder="Site Title (e.g. My Portfolio)" />
           <div class="split">
             <div>
               <label style="font-size:.85rem;color:var(--muted)">HTML / CSS / JS Source</label>
