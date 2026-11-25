@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NaMehost — Instant Static Web Hosting</title>
+  <style>
+    :root{--bg:#090d16;--card:#111827;--border:#1f2937;--accent:#3b82f6;--accent-h:#2563eb;--text:#f8fafc;--muted:#94a3b8;--danger:#ef4444}
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);margin:0;line-height:1.5}
+    nav{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:14px 24px;background:rgba(17,24,39,.9);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+    .brand{font-weight:800;font-size:1.25rem;color:#fff;cursor:pointer;border:none;background:none;padding:0}
+    .brand span{color:var(--accent)}
+    .nav-links{display:flex;gap:8px;flex-wrap:wrap}
+    .nav-btn{background:transparent;border:1px solid transparent;color:var(--muted);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:500}
+    .nav-btn:hover,.nav-btn.active{color:#fff;background:#1e293b;border-color:#334155}
+    .nav-btn.primary{background:var(--accent);color:#fff}
+    main{max-width:960px;margin:28px auto;padding:0 18px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:18px}
+    .hero{text-align:center;padding:42px 20px}
+    .hero h1{font-size:2.1rem;margin:10px 0 12px}
+    .hero p{color:var(--muted);max-width:560px;margin:0 auto 24px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+    input,textarea{width:100%;margin-top:8px;padding:11px 13px;border-radius:9px;border:1px solid #334155;background:#0b1120;color:#fff;font-family:inherit;font-size:.95rem}
+    textarea{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88rem}
+    button.btn{padding:10px 16px;border-radius:9px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer;margin-top:10px}
+    button.btn.sec{background:#1e293b;border:1px solid #334155}
+    button.btn.del{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3);margin:0}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .site-card{background:#0b1120;border:1px solid #1e293b;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+    .badge{font-size:.75rem;padding:3px 8px;border-radius:999px;background:#1e293b;color:#93c5fd}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:720px){.split{grid-template-columns:1fr}}
+    iframe.prev{width:100%;height:320px;border:1px solid #334155;border-radius:9px;background:#fff;margin-top:8px}
+    .msg{margin-top:10px;font-size:.9rem;color:#93c5fd;word-break:break-word}
+    a{color:#60a5fa;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    const _sbCfg = [
+      "aHR0cHM6Ly9kcXh4ZG12Zm1ld3NzZWZtaHBwcy5zdXBhYmFzZS5jbw==",
+      "c2JfcHVibGlzaGFibGVfeHNQZWltdEltOTE0ZzgxclcyREpid19COTlWbW1Yaw=="
+    ].map(s => atob(s));
+    const sb = createClient(_sbCfg[0], _sbCfg[1]);
+
+    const SESSION_KEY = "namehost_user";
+    const root = document.getElementById("root");
+
+    let user = null;
+    try {
+      user = localStorage.getItem(SESSION_KEY) || null;
+    } catch {}
+
+    let page = "home";
+
+    const el = (tag, attrs = {}, kids = []) => {
+      const node = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v;
+        else if (k === "onclick") node.onclick = v;
+        else if (k === "oninput") node.oninput = v;
+        else node.setAttribute(k, v);
+      }
+      for (const child of [].concat(kids)) {
+        if (child != null) {
+          node.append(typeof child === "string" ? document.createTextNode(child) : child);
+        }
+      }
+      return node;
+    };
+
+    async function hashPw(str) {
+      if (window.crypto && crypto.subtle && typeof crypto.subtle.digest === "function") {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+      }
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0).toString(16).padStart(8, "0");
+    }
+
+    const shareUrl = id => location.origin + location.pathname + "#s-" + id;
+
+    async function renderHosted(id) {
+      const { data, error } = await sb.from("name_sites").select("*").eq("id", id).single();
+      if (error || !data) {
+        root.replaceChildren(el("main", {}, [
+          el("div", { class: "card" }, [
+            el("h2", { text: "Site not found." }),
+            el("a", { href: location.pathname, text: "Return to NaMehost" })
+          ])
+        ]));
+        return;
+      }
+      document.title = data.name + " — NaMehost";
+      document.open();
+      document.write(data.html);
+      document.close();
+    }
+
+    function buildNav() {
+      const links = [
+        el("button", { class: "nav-btn" + (page === "home" ? " active" : ""), text: "Home", onclick: () => go("home") }),
+        el("button", { class: "nav-btn" + (page === "explore" ? " active" : ""), text: "Explore", onclick: () => go("explore") }),
+        el("button", { class: "nav-btn" + (page === "docs" ? " active" : ""), text: "Docs", onclick: () => go("docs") })
+      ];
+      if (user) {
+        links.push(
+          el("button", { class: "nav-btn" + (page === "dashboard" ? " active" : ""), text: "Dashboard", onclick: () => go("dashboard") }),
+          el("button", { class: "nav-btn" + (page === "editor" ? " active" : ""), text: "+ New Site", onclick: () => go("editor") }),
+          el("button", {
+            class: "nav-btn",
+            text: "Sign Out (@" + user + ")",
+            onclick: () => {
+              user = null;
+              try { localStorage.removeItem(SESSION_KEY); } catch {}
+              go("home");
+            }
+          })
+        );
+      } else {
+        links.push(
+          el("button", { class: "nav-btn primary", text: "Sign In / Register", onclick: () => go("auth") })
+        );
+      }
+      return el("nav", {}, [
+        el("button", { class: "brand", onclick: () => go("home") }, ["NaMe", el("span", { text: "host" })]),
+        el("div", { class: "nav-links" }, links)
+      ]);
+    }
+
+    async function go(target) {
+      if ((target === "dashboard" || target === "editor") && !user) target = "auth";
+      page = target;
+      const main = el("main");
+
+      if (target === "home") {
+        main.append(
+          el("div", { class: "card hero" }, [
+            el("span", { class: "badge", text: "Cloud Static Hosting" }),
+            el("h1", { text: "Deploy HTML pages in seconds with NaMehost" }),
+            el("p", { text: "Write, preview, and publish single-file websites with instant shareable links." }),
+            el("div", { class: "row", style: "justify-content:center" }, [
+              el("button", { class: "btn", text: user ? "Launch Site Editor" : "Get Started Free", onclick: () => go(user ? "editor" : "auth") }),
+              el("button", { class: "btn sec", text: "Browse Community Sites", onclick: () => go("explore") })
+            ])
+          ]),
+          el("div", { class: "grid" }, [
+            el("div", { class: "card" }, [el("h3", { text: "Instant Share Links" }), el("p", { style: "color:var(--muted)", text: "Every published page gets a permanent #s-id link." })]),
+            el("div", { class: "card" }, [el("h3", { text: "Live Sandbox Preview" }), el("p", { style: "color:var(--muted)", text: "Test your HTML, CSS, and JavaScript live before publishing." })]),
+            el("div", { class: "card" }, [el("h3", { text: "Manage & Delete" }), el("p", { style: "color:var(--muted)", text: "Keep all your hosted pages organized in your dashboard." })])
+          ])
+        );
+      }
+
+      if (target === "docs") {
+        main.append(el("div", { class: "card" }, [
+          el("h2", { text: "NaMehost Documentation" }),
+          el("p", { style: "color:var(--muted)", text: "NaMehost stores single-file HTML pages and renders them directly in the visitor's browser." }),
+          el("h3", { text: "1. Supported Code" }),
+          el("p", { text: "Include inline style and script tags inside one HTML document. External CDN links also work." }),
+          el("h3", { text: "2. Share Links" }),
+          el("p", { text: "Published sites open via " + location.origin + location.pathname + "#s-your-site-id" })
+        ]));
+      }
+
+      if (target === "auth") {
+        const uIn = el("input", { placeholder: "Username" });
+        const pIn = el("input", { type: "password", placeholder: "Password" });
+        const msg = el("div", { class: "msg" });
+
+        const doReg = async () => {
+          try {
+            const u = uIn.value.trim().toLowerCase();
+            const p = pIn.value;
+            if (!u || !p) { msg.textContent = "Enter username and password."; return; }
+            msg.textContent = "Registering...";
+            const pass_hash = await hashPw(p);
+            const { error } = await sb.from("name_users").insert({ username: u, pass_hash });
+            msg.textContent = error ? error.message : "Account created! Now tap Sign In.";
+          } catch (e) {
+            msg.textContent = e.message || String(e);
+          }
+        };
+
+        const doIn = async () => {
+          try {
+            const u = uIn.value.trim().toLowerCase();
+            const p = pIn.value;
+            if (!u || !p) { msg.textContent = "Enter username and password."; return; }
+            msg.textContent = "Signing in...";
+            const pass_hash = await hashPw(p);
+            const { data, error } = await sb.from("name_users").select("username").eq("username", u).eq("pass_hash", pass_hash).single();
+            if (error || !data) { msg.textContent = error ? error.message : "Invalid username or password."; return; }
+            user = data.username;
+            try { localStorage.setItem(SESSION_KEY, user); } catch {}
+            go("dashboard");
+          } catch (e) {
+            msg.textContent = e.message || String(e);
+          }
+        };
+
+        main.append(el("div", { class: "card", style: "max-width:440px;margin:20px auto" }, [
+          el("h2", { text: "Account Access" }),
+          el("p", { style: "color:var(--muted)", text: "Sign in or create a new NaMehost creator account." }),
+          uIn, pIn,
+          el("div", { class: "row" }, [
+            el("button", { class: "btn", style: "flex:1", text: "Sign In", onclick: doIn }),
+            el("button", { class: "btn sec", style: "flex:1", text: "Register", onclick: doReg })
+          ]),
+          msg
+        ]));
+      }
+
+      if (target === "editor") {
+        const titleIn = el("input", { placeholder: "Site Title (e.g. My Portfolio)" });
+        const starter = "<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: sans-serif; background: #0f172a; color: #fff; text-align: center; padding: 50px; }\n    h1 { color: #38bdf8; }\n  </style>\n</head>\n<body>\n  <h1>Hello from NaMehost!</h1>\n  <p>Edit this code and click Publish.</p>\n</body>\n</html>";
+        const codeIn = el("textarea", { rows: "14" }, [starter]);
+        const prev = el("iframe", { class: "prev", sandbox: "allow-scripts" });
+        prev.srcdoc = starter;
+        codeIn.oninput = () => { prev.srcdoc = codeIn.value; };
+        const msg = el("div", { class: "msg" });
+
+        const doPub = async () => {
+          try {
+            const nm = titleIn.value.trim() || "Untitled Site";
+            const id = user + "-" + Date.now().toString(36);
+            msg.textContent = "Publishing...";
+            const { error } = await sb.from("name_sites").insert({ id, owner: user, name: nm, html: codeIn.value, updated: Date.now() });
+            if (error) { msg.textContent = error.message; return; }
+            const url = shareUrl(id);
+            try { await navigator.clipboard.writeText(url); } catch {}
+            msg.replaceChildren("Published! ", el("a", { href: url, target: "_blank", text: url }));
+          } catch (e) {
+            msg.textContent = e.message || String(e);
+          }
+        };
+
+        main.append(el("div", { class: "card" }, [
+          el("h2", { style: "margin-top:0", text: "Site Builder & Live Preview" }),
+          titleIn,
+          el("div", { class: "split" }, [
+            el("div", {}, [el("label", { style: "font-size:.85rem;color:var(--muted)", text: "HTML / CSS / JS Source" }), codeIn]),
+            el("div", {}, [el("label", { style: "font-size:.85rem;color:var(--muted)", text: "Live Preview" }), prev])
+          ]),
+          el("div", { class: "row" }, [
+            el("button", { class: "btn", text: "Publish Site", onclick: doPub }),
+            el("button", { class: "btn sec", text: "Back to Dashboard", onclick: () => go("dashboard") })
+          ]),
+          msg
+        ]));
+      }
+
+      if (target === "dashboard") {
+        const listBox = el("div", { text: "Loading your sites..." });
+        main.append(
+          el("div", { class: "card" }, [
+            el("div", { class: "row", style: "justify-content:space-between" }, [
+              el("div", {}, [el("h2", { style: "margin:0", text: "Creator Dashboard" }), el("p", { style: "color:var(--muted);margin:4px 0 0", text: "Signed in as @" + user })]),
+              el("button", { class: "btn", text: "+ Create New Site", onclick: () => go("editor") })
+            ])
+          ]),
+          el("div", { class: "card" }, [el("h3", { text: "Your Hosted Sites" }), listBox])
+        );
+        root.replaceChildren(buildNav(), main);
+
+        const { data } = await sb.from("name_sites").select("*").eq("owner", user).order("updated", { ascending: false });
+        if (!data || !data.length) {
+          listBox.textContent = "No sites published yet. Click '+ Create New Site' to start.";
+        } else {
+          listBox.replaceChildren(...data.map(s => {
+            const url = shareUrl(s.id);
+            return el("div", { class: "site-card" }, [
+              el("div", {}, [el("strong", { text: s.name }), el("br"), el("a", { href: url, target: "_blank", text: url })]),
+              el("div", { class: "row" }, [
+                el("a", { class: "nav-btn active", href: url, target: "_blank", text: "Open" }),
+                el("button", {
+                  class: "btn del",
+                  text: "Delete",
+                  onclick: async () => {
+                    await sb.from("name_sites").delete().eq("id", s.id).eq("owner", user);
+                    go("dashboard");
+                  }
+                })
+              ])
+            ]);
+          }));
+        }
+        return;
+      }
+
+      if (target === "explore") {
+        const listBox = el("div", { text: "Loading sites..." });
+        main.append(el("div", { class: "card" }, [
+          el("h2", { text: "Explore Recent Sites" }),
+          el("p", { style: "color:var(--muted)", text: "Public websites hosted on NaMehost." }),
+          listBox
+        ]));
+        root.replaceChildren(buildNav(), main);
+
+        const { data } = await sb.from("name_sites").select("id,name,owner,updated").order("updated", { ascending: false }).limit(20);
+        if (!data || !data.length) {
+          listBox.textContent = "No public sites yet.";
+        } else {
+          listBox.replaceChildren(...data.map(s => {
+            const url = shareUrl(s.id);
+            return el("div", { class: "site-card" }, [
+              el("div", {}, [el("strong", { text: s.name + " " }), el("span", { class: "badge", text: "@" + s.owner }), el("br"), el("a", { href: url, target: "_blank", text: url })]),
+              el("a", { class: "nav-btn active", href: url, target: "_blank", text: "Visit Site" })
+            ]);
+          }));
+        }
+        return;
+      }
+
+      root.replaceChildren(buildNav(), main);
+    }
+
+    const h = location.hash || "";
+    if (h.startsWith("#s-")) renderHosted(h.slice(3));
+    else go("home");
+  </script>
+</body>
+</html>
+
